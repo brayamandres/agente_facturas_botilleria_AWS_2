@@ -11,9 +11,9 @@ import boto3
 BASE_DIR = Path(__file__).resolve().parent
 ROOT_DIR = BASE_DIR.parent
 if (BASE_DIR / ".env").exists():
-    load_dotenv(dotenv_path=BASE_DIR / ".env", override=True)
+    load_dotenv(dotenv_path=BASE_DIR / ".env", override=False)
 elif (ROOT_DIR / ".env").exists():
-    load_dotenv(dotenv_path=ROOT_DIR / ".env", override=True)
+    load_dotenv(dotenv_path=ROOT_DIR / ".env", override=False)
 
 # Parámetros de Región y Configuración AWS
 AWS_REGION = os.getenv("AWS_REGION", "us-east-1")

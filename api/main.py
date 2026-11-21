@@ -665,9 +665,9 @@ def listar_historial_facturas():
 # ============================================================================
 
 class PeticionInferenciaModelo(BaseModel):
-    glosa: str = Field(..., example="PISCO MISTRAL 35 750CC", description="Glosa o descripción del producto en la factura")
-    proveedor: Optional[str] = Field(default="CCU CHILE", example="CCU CHILE", description="Nombre del proveedor o distribuidor")
-    precio_unitario: Optional[float] = Field(default=None, example=5490.0, description="Precio unitario neto en CLP")
+    glosa: str = Field(..., description="Glosa o descripción del producto en la factura", examples=["PISCO MISTRAL 35 750CC"])
+    proveedor: Optional[str] = Field(default="CCU CHILE", description="Nombre del proveedor o distribuidor", examples=["CCU CHILE"])
+    precio_unitario: Optional[float] = Field(default=None, description="Precio unitario neto en CLP", examples=[5490.0])
 
 
 class RespuestaInferenciaModelo(BaseModel):
@@ -701,8 +701,7 @@ async def info_modelo_cloud(
         "region": AWS_REGION,
         "tipo_despliegue": "AIaaS Serverless (Boto3 Runtime)",
         "framework": "Scikit-Learn / HuggingFace Transformers",
-        "interpretabilidad_soportada": True,
-        "indicadores_evaluacion": ["IE1", "IE2", "IE4", "E6"]
+        "interpretabilidad_soportada": True
     }
 
 

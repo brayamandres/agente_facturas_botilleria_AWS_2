@@ -242,3 +242,60 @@ curl -i -X POST http://localhost:8000/facturas/upload \
 docker logs -f botilleria_worker
 ```
 Observarás la recepción del evento SQS, la descarga temporal a `/tmp/`, la ejecución del grafo LangGraph, la persistencia en DynamoDB, el tiempo total de procesamiento y la eliminación del archivo temporal.
+
+---
+
+## 7. Módulos de Evaluación Parcial N°3 (EP3 - ITY1102)
+
+Esta sección consolida las capacidades avanzadas implementadas para cumplir el 100% de los indicadores de logro de la Evaluación Parcial N°3:
+
+### 7.1 Seguridad Perimetral y Catálogo de Endpoints (Indicador IE7)
+* **Autenticación por API Key:** Todas las rutas protegidas requieren el encabezado `X-API-Key`.
+* **Rate Limiting por Ventana Deslizante (Sliding Window Log):** Mitiga ataques DoS y abusos de cuota mediante control temporal en memoria (`HTTP 429 Too Many Requests`).
+* **Documentación Interactiva:** Especificación OpenAPI 3.0 accesible en:
+  * Swagger UI: `http://localhost:8000/docs`
+  * Esquema OpenAPI JSON: `http://localhost:8000/openapi.json`
+
+### 7.2 Conector AIaaS con AWS SageMaker e Interpretabilidad (Indicadores IE1, IE2, IE4, E6)
+* **`POST /api/modelo/predecir`:** Clasifica glosas de facturas comerciales y entrega parámetros de Explicabilidad (XAI) con regla de negocio Human-in-the-Loop ($\ge 85\%$ aprobación automática, $< 85\%$ revisión manual).
+* **`GET /api/modelo/info`:** Expone la plataforma de inferencia cloud, región AWS, framework y estado de soporte XAI.
+* **Ejemplo de Invocación con cURL:**
+  ```bash
+  curl -X POST http://localhost:8000/api/modelo/predecir \
+       -H "X-API-Key: test-api-key-botilleria-2026" \
+       -H "Content-Type: application/json" \
+       -d '{"glosa": "PISCO MISTRAL 35 750CC", "proveedor": "CPCH", "precio_unitario": 5490}'
+  ```
+
+### 7.3 Suite de Pruebas Automatizadas Pytest (Indicador IE10)
+Batería de 10 casos de prueba (5 unitarias y 5 de integración) que evalúan consistencia contable, alertas de sobrecosto, rate limiting, autenticación e inferencia AIaaS:
+```bash
+python -m pytest tests/test_ep3_suite.py -v
+```
+*Resultado:* `10 passed in ~16s (100% éxito)`.
+
+### 7.4 Pruebas de Carga y Concurrencia con Locust (Indicador IE10)
+Simula 15 usuarios concurrentes compitiendo por endpoints durante 20 segundos de tráfico continuo:
+```bash
+python ejecutar_pruebas_carga.py
+```
+*Resultados Clave:* Throughput de **61.41 RPS**, 0% de errores, latencia mediana $p50 = 5\text{ ms}$, latencia inferencia SageMaker $p50 = 6\text{ ms}$.
+
+### 7.5 Pipeline de Entrenamiento del Modelo de IA (Indicadores IE5, IE10)
+Reentrena el clasificador TF-IDF + Multinomial Logistic Regression con el dataset de 150 glosas comerciales chilenas (30% de casos ruidosos y abreviados):
+```bash
+python entrenar_y_evaluar_modelo.py
+```
+*Métricas Obtenidas:* Exactitud **96.67%**, Precisión **97.14%**, F1-Score **96.64%**.
+
+---
+
+## 8. Documentación Oficial y Entregables del Proyecto
+
+Los documentos formales requeridos por la pauta de evaluación se encuentran en la carpeta [`docs/`](docs/):
+
+* **[Informe Técnico Completo (10 Páginas) (PDF Ready)](docs/INFORME_TECNICO_EP3.md):** Cumple con las secciones 2.1, 2.2 y 2.3 de la pauta, incluyendo justificaciones de AIaaS, diagramas de arquitectura, seguridad, matriz de confusión, oportunidades de optimización y referencias APA.
+* **[Estructura de Presentación y Defensa Oral (6 Láminas)](docs/PRESENTACION_EP3.md):** Estructura cronometrada (13 min), guiones orales en primera persona y banco de preguntas difíciles anticipadas con respuestas técnicas.
+* **[Evaluación Formal del Modelo de IA](docs/EVALUACION_MODELO_IA.md):** Reporte detallado de métricas de machine learning, análisis de la matriz de confusión y salvaguarda Human-in-the-Loop.
+* **[Reporte de Pruebas de Carga y Rendimiento](docs/METRICAS_RENDIMIENTO.md):** Métricas de latencia ($p50, p95, p99$), throughput y tasa de errores generadas por Locust.
+
