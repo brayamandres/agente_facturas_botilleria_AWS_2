@@ -6,6 +6,7 @@ Implementa los requisitos formales de la rúbrica:
 2. Control de Tasa (Rate Limiting) basado en algoritmo Sliding Window en memoria, compatible con balanceadores ALB.
 """
 import time
+import secrets
 import logging
 import threading
 from typing import Dict, List, Optional
@@ -170,3 +171,23 @@ def verificar_api_key(
         detail="Autenticación requerida. Proporcione la cabecera 'X-API-Key' con su credencial corporativa autorizada.",
         headers={"WWW-Authenticate": "ApiKey"}
     )
+
+
+def verificar_api_key_modelo(
+    x_api_key: Optional[str] = Security(API_KEY_HEADER)
+) -> str:
+    """El modelo exige una clave real en la cabecera, también desde Swagger."""
+    if not API_KEY:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Configura API_KEY para habilitar el modelo."
+        )
+    if not x_api_key or not secrets.compare_digest(
+        x_api_key.encode("utf-8"), API_KEY.encode("utf-8")
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Se requiere una cabecera X-API-Key válida para acceder al modelo.",
+            headers={"WWW-Authenticate": "ApiKey"}
+        )
+    return x_api_key

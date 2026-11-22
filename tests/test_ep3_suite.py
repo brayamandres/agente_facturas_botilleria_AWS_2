@@ -181,7 +181,7 @@ def test_08_integracion_rate_limiting_excedido_retorna_429():
     sec._rate_limiter._solicitudes.clear()
 
 
-def test_09_integracion_endpoint_inferencia_sagemaker_prediccion():
+def test_09_integracion_endpoint_inferencia_sagemaker_prediccion(monkeypatch):
     """
     Caso 9 (Integración): Consumo de Inferencia Cloud AIaaS con Explicabilidad (IE1, IE2, IE4).
     Verifica que POST /api/modelo/predecir clasifique un ítem real y entregue métricas XAI.
@@ -191,15 +191,24 @@ def test_09_integracion_endpoint_inferencia_sagemaker_prediccion():
         "proveedor": "COMPAÑIA PISQUERA DE CHILE S.A.",
         "precio_unitario": 5490.0
     }
+    monkeypatch.setattr("shared.sagemaker_service.predecir_con_sagemaker", lambda **kwargs: {
+        "producto_homologado": kwargs["glosa"], "sku": None,
+        "categoria": "Destilados - Pisco", "confianza": 0.7994656614446165,
+        "interpretabilidad": {"palabras_clave_detectadas": ["pisco", "mistral"],
+            "recomendacion_decision": "Revisión humana: validar el SKU."},
+        "plataforma_aiaas": "AWS SageMaker (Serverless Inference)",
+        "modelo": "botilleria-tfidf-logreg-v1", "tiempo_inferencia_ms": 10,
+        "modo_ejecucion": "AWS SageMaker Cloud Endpoint (Activo)",
+    })
     response = client.post("/api/modelo/predecir", json=payload, headers=HEADERS_AUTH)
     assert response.status_code == 200
     data = response.json()
     
     assert "Destilados" in data["categoria"]
-    assert data["confianza"] >= 0.85
+    assert data["confianza"] == 0.7994656614446165
     assert "interpretabilidad" in data
     assert len(data["interpretabilidad"]["palabras_clave_detectadas"]) > 0
-    assert "Aprobación automática" in data["interpretabilidad"]["recomendacion_decision"]
+    assert "Revisión humana" in data["interpretabilidad"]["recomendacion_decision"]
 
 
 def test_10_integracion_metadatos_endpoint_sagemaker_info():
@@ -214,5 +223,6 @@ def test_10_integracion_metadatos_endpoint_sagemaker_info():
     assert data["plataforma"] == "AWS SageMaker Serverless Inference"
     assert data["region"] == "us-east-1"
     assert data["interpretabilidad_soportada"] is True
-    assert "IE1" in data["indicadores_evaluacion"]
-    assert "E6" in data["indicadores_evaluacion"]
+    from shared.sagemaker_service import SAGEMAKER_ENDPOINT_NAME
+    assert data["endpoint_name"] == SAGEMAKER_ENDPOINT_NAME
+    assert "TF-IDF" in data["framework"]

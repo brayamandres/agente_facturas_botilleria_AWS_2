@@ -25,6 +25,8 @@ from shared.finanzas import validar_finanzas
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
+from api.security import verificar_api_key_modelo
+
 from api.config import (
     S3_BUCKET_NAME,
     SQS_QUEUE_URL,
@@ -665,7 +667,7 @@ def listar_historial_facturas():
 # ============================================================================
 
 class PeticionInferenciaModelo(BaseModel):
-    glosa: str = Field(..., description="Glosa o descripción del producto en la factura", examples=["PISCO MISTRAL 35 750CC"])
+    glosa: str = Field(..., min_length=1, max_length=10000, description="Glosa o descripción del producto en la factura", examples=["PISCO MISTRAL 35 750CC"])
     proveedor: Optional[str] = Field(default="CCU CHILE", description="Nombre del proveedor o distribuidor", examples=["CCU CHILE"])
     precio_unitario: Optional[float] = Field(default=None, description="Precio unitario neto en CLP", examples=[5490.0])
 
@@ -674,7 +676,7 @@ class RespuestaInferenciaModelo(BaseModel):
     producto_homologado: str
     sku: Optional[str] = None
     categoria: str
-    confianza: float
+    confianza: float = Field(ge=0, le=1, allow_inf_nan=False)
     interpretabilidad: Dict[str, Any]
     plataforma_aiaas: str
     modelo: str
@@ -690,7 +692,7 @@ class RespuestaInferenciaModelo(BaseModel):
     responses={**RESPUESTAS_SEGURIDAD}
 )
 async def info_modelo_cloud(
-    _auth: str = Depends(verificar_api_key),
+    _auth: str = Depends(verificar_api_key_modelo),
     _limiter: None = Depends(rate_limit_global)
 ):
     """Metadatos de la plataforma AIaaS y endpoint desplegado."""
@@ -700,7 +702,7 @@ async def info_modelo_cloud(
         "endpoint_name": SAGEMAKER_ENDPOINT_NAME,
         "region": AWS_REGION,
         "tipo_despliegue": "AIaaS Serverless (Boto3 Runtime)",
-        "framework": "Scikit-Learn / HuggingFace Transformers",
+        "framework": "Scikit-Learn / TF-IDF + LogisticRegression",
         "interpretabilidad_soportada": True
     }
 
@@ -716,23 +718,25 @@ async def info_modelo_cloud(
     ),
     responses={**RESPUESTAS_SEGURIDAD}
 )
-async def predecir_con_modelo_cloud(
+def predecir_con_modelo_cloud(
     peticion: PeticionInferenciaModelo,
-    _auth: str = Depends(verificar_api_key),
+    _auth: str = Depends(verificar_api_key_modelo),
     _limiter: None = Depends(rate_limit_global)
 ):
     """Endpoint REST para consumo del modelo en plataforma cloud (Indicador IE1, IE2, IE4)."""
     from shared.sagemaker_service import predecir_con_sagemaker
+    if not peticion.glosa.strip():
+        raise HTTPException(status_code=422, detail="La glosa no puede contener solo espacios.")
     try:
         resultado = predecir_con_sagemaker(
-            glosa=peticion.glosa,
+            glosa=peticion.glosa.strip(),
             proveedor=peticion.proveedor or "Distribuidor General",
             precio_unitario=peticion.precio_unitario
         )
-        return resultado
-    except Exception as err:
-        logger.error("Error durante inferencia con SageMaker: %s", str(err))
+        return RespuestaInferenciaModelo.model_validate(resultado)
+    except Exception:
+        logger.exception("Error durante inferencia con SageMaker")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Fallo en la inferencia del modelo cloud: {str(err)}"
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="SageMaker no está disponible. Revisa los logs de la API."
         )
